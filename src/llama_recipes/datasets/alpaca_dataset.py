@@ -47,21 +47,33 @@ class InstructionDataset(Dataset):
             prompt = PROMPT_DICT["prompt_no_input"].format_map(ann)
         else:
             prompt = PROMPT_DICT["prompt_input"].format_map(ann)
-        example = prompt + ann["output"]
+            # 注释1: 这里，prompt = instruction + input
+
+        # example用来生成：大模型输入&GroundTruth，通过0、-100token掩码调对应部分
+        example = prompt + ann["output"] # 注释2: example = prompt + output
+
         prompt = torch.tensor(
             self.tokenizer.encode(prompt), dtype=torch.int64
         )
         example = self.tokenizer.encode(example)
-        example.append(self.tokenizer.eos_token_id)
+        example.append(self.tokenizer.eos_token_id) # 注释3: example = prompt + output + <eos>
         example = torch.tensor(
             example, dtype=torch.int64
         )
-        labels = copy.deepcopy(example)
-        labels[: len(prompt)] = -1
+
         example_mask = example.ge(0)
-        label_mask = labels.ge(0)
         example[~example_mask] = 0
-        labels[~label_mask] = IGNORE_INDEX
+
+        labels = copy.deepcopy(example)  # 深拷贝, labels = example = prompt + output + <eos>
+        labels[: len(prompt)] = -1       # 注释4: label里prompt的部分置-1
+        label_mask = labels.ge(0)        # great or equal
+        labels[~label_mask] = IGNORE_INDEX # 注释5: label里prompt的部分置-100
+
+       
+        
+        
+
+        
 
         return {
             "input_ids": example.tolist(),
